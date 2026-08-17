@@ -25,10 +25,13 @@ try {
   if (!fs.existsSync(skillPath)) process.exit(0);
 
   // Strip a leading YAML frontmatter block (--- ... --- at the very top of file).
+  // The body group is optional so an empty block (`---` directly followed by
+  // `---`) is stripped too; requiring a newline before the closing delimiter left
+  // that case unmatched here while the sh and PowerShell hooks stripped it.
   const body = fs
     .readFileSync(skillPath, "utf8")
     .replace(
-      /^---[^\S\r\n]*\r?\n[\s\S]*?\r?\n---[^\S\r\n]*(?:\r?\n|$)/,
+      /^---[^\S\r\n]*\r?\n(?:[\s\S]*?\r?\n)?---[^\S\r\n]*(?:\r?\n|$)/,
       "",
     )
     .replace(/(?:\r?\n)+$/, "");

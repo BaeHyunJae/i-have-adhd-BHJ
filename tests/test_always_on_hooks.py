@@ -108,6 +108,28 @@ class AlwaysOnHookTest(unittest.TestCase):
 
         self.assertEqual(1, len(set(outputs.values())))
 
+    def test_runtimes_strip_an_empty_frontmatter_block(self):
+        # An opening --- immediately followed by the closing --- is a valid but
+        # empty frontmatter block. The Node regex required a newline before the
+        # closing delimiter, so it left the block in place while the sh and
+        # PowerShell hooks stripped it — a parity gap the other cases missed.
+        skill_path = self.plugin_root / "skills" / "i-have-adhd" / "SKILL.md"
+        skill_path.write_text("---\n---\nFixture body.\n")
+        (self.config_dir / ".i-have-adhd-always").touch()
+        outputs = {}
+
+        for name, command in self.runtimes():
+            with self.subTest(runtime=name):
+                result = self.run_hook(command)
+                self.assertEqual(0, result.returncode)
+                self.assertEqual("", result.stderr)
+                normalized = self.normalize(result.stdout)
+                self.assertNotIn("\n---\n", normalized)
+                self.assertIn("\n\nFixture body.\n", normalized)
+                outputs[name] = normalized
+
+        self.assertEqual(1, len(set(outputs.values())))
+
     def test_hook_uses_shell_free_node_exec_form(self):
         config = json.loads((ROOT / "hooks" / "hooks.json").read_text())
         hook = config["hooks"]["SessionStart"][0]["hooks"][0]

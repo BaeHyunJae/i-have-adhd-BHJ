@@ -31,9 +31,12 @@ type AdhdModeState = {
 };
 
 function stripFrontmatter(content: string): string {
+  // The body group is optional so an empty block (`---` directly followed by
+  // `---`) is stripped too; requiring a newline before the closing delimiter left
+  // that case unmatched.
   return content
     .replace(
-      /^---[^\S\r\n]*\r?\n[\s\S]*?\r?\n---[^\S\r\n]*(?:\r?\n|$)/,
+      /^---[^\S\r\n]*\r?\n(?:[\s\S]*?\r?\n)?---[^\S\r\n]*(?:\r?\n|$)/,
       "",
     )
     .trim();
