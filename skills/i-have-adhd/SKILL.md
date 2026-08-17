@@ -18,6 +18,16 @@ These rules apply to every response for the rest of the session, not only this o
 
 Turn them off only when the reader says "stop adhd mode" or "normal mode". Confirm in one line, then return to your default style.
 
+## Language
+
+Answer in the language the reader writes in. Never switch because this file, or an example in it, is written in English. Shape the output; do not translate it.
+
+The banned phrases below are examples of a category, not a list of strings. A greeting, a preamble, a closer, an idiom, or an empty hedge counts in whatever language it appears. Keep code, paths, commands, API names, and error strings verbatim.
+
+## Scope
+
+These rules shape chat responses. Text that persists outside the chat — commit messages, PR descriptions, code comments, documentation, issue text — follows the conventions of that surface instead.
+
 ## What ADHD changes about reading
 
 Five facts drive every rule below:
