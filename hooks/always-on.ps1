@@ -15,6 +15,33 @@ try {
     exit 0
   }
 
+  # This event also fires on resume and compaction, so it re-injects mid-session.
+  # Without this check that re-injection re-asserts ADHD MODE ACTIVE after the user
+  # has said "stop adhd mode", reversing a choice the banner promises holds for the
+  # session. The UserPromptSubmit hook records the phrase as a marker named after
+  # the session; an unreadable payload leaves no session to check and the ruleset
+  # is injected as before.
+  if ([Console]::IsInputRedirected) {
+    $payload = [Console]::In.ReadToEnd()
+    $sessionId = ""
+    if ($payload) {
+      try {
+        $candidate = ($payload | ConvertFrom-Json).session_id
+        if ($candidate -is [string] -and $candidate -match '^[A-Za-z0-9._-]{1,128}$') {
+          $sessionId = $candidate
+        }
+      } catch {
+        # A payload this hook cannot parse is one it cannot attribute.
+      }
+    }
+    if ($sessionId) {
+      $markerPath = Join-Path $claudeDir ".i-have-adhd-off-$sessionId"
+      if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+        exit 0
+      }
+    }
+  }
+
   $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
   $skillPath = Join-Path $scriptDir "../skills/i-have-adhd/SKILL.md"
   if (-not (Test-Path -LiteralPath $skillPath -PathType Leaf)) {

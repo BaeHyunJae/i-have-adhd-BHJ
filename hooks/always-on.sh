@@ -12,6 +12,20 @@ flag_path="$claude_dir/.i-have-adhd-always"
 # Only fire when the user has opted in.
 [ -f "$flag_path" ] || exit 0
 
+# This event also fires on resume and compaction, so it re-injects mid-session.
+# Without this check that re-injection re-asserts ADHD MODE ACTIVE after the user
+# has said "stop adhd mode", reversing a choice the banner promises holds for the
+# session. The UserPromptSubmit hook records the phrase as a marker named after
+# the session. Only the id is read out of the payload, with a character class
+# tight enough that no shell metacharacter can reach the path; an unreadable
+# payload leaves no session to check and the ruleset is injected as before.
+if [ ! -t 0 ]; then
+  session_id=$(sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([A-Za-z0-9._-]\{1,128\}\)".*/\1/p' | head -n 1)
+  if [ -n "$session_id" ] && [ -f "$claude_dir/.i-have-adhd-off-$session_id" ]; then
+    exit 0
+  fi
+fi
+
 # $0 is the absolute script path substituted into hooks.json by Claude Code,
 # so resolve SKILL.md relative to it instead of trusting an exported env var.
 script_dir=$(dirname -- "$0")

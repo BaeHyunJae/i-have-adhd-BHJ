@@ -102,7 +102,7 @@ Back to on-demand:
 rm ~/.claude/.i-have-adhd-always
 ```
 
-The hook only fires when the flag file exists, so installing the plugin changes nothing by itself. Honors `$CLAUDE_CONFIG_DIR` if you've moved your config dir. "stop adhd mode" still turns it off for the current session.
+The hook only fires when the flag file exists, so installing the plugin changes nothing by itself. Honors `$CLAUDE_CONFIG_DIR` if you've moved your config dir. "stop adhd mode" still turns it off for the current session, and it stays off: a companion `UserPromptSubmit` hook records it, so the re-injection that fires on resume and compaction leaves it alone. Invoke `/i-have-adhd` again to turn it back on.
 
 </details>
 

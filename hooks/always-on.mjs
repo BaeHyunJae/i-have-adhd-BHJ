@@ -12,12 +12,35 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+// Reading the payload is what lets this hook tell one session from another. A
+// TTY means a manual run with no payload to read, where a blocking read hangs.
+function readSessionId() {
+  if (process.stdin.isTTY) return "";
+  try {
+    const raw = fs.readFileSync(0, "utf8");
+    const id = raw ? JSON.parse(raw).session_id : "";
+    return typeof id === "string" && /^[A-Za-z0-9._-]{1,128}$/.test(id) ? id : "";
+  } catch {
+    return "";
+  }
+}
+
 try {
   const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
   const flagPath = path.join(claudeDir, ".i-have-adhd-always");
 
   // Only fire when the user has opted in.
   if (!fs.existsSync(flagPath)) process.exit(0);
+
+  // This event also fires on resume and compaction, so it re-injects mid-session.
+  // Without this check that re-injection re-asserts ADHD MODE ACTIVE after the
+  // user has said "stop adhd mode", reversing a choice the banner promises holds
+  // for the session. The UserPromptSubmit hook records the phrase; an unreadable
+  // payload leaves no session to check and injects as before.
+  const sessionId = readSessionId();
+  if (sessionId && fs.existsSync(path.join(claudeDir, ".i-have-adhd-off-" + sessionId))) {
+    process.exit(0);
+  }
 
   // Resolve SKILL.md relative to this script's own location, not a trusted env var.
   const scriptDir = path.dirname(fileURLToPath(import.meta.url));

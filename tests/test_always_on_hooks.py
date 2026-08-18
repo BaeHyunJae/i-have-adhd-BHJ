@@ -42,15 +42,19 @@ class AlwaysOnHookTest(unittest.TestCase):
             )
         return runtimes
 
-    def run_hook(self, command):
+    def run_hook(self, command, payload=None):
         env = os.environ.copy()
         env["CLAUDE_CONFIG_DIR"] = str(self.config_dir)
+        # Always hand the hook a closed stdin. Claude Code writes a payload and
+        # closes the pipe; a test that let the runner's own stdin through would
+        # leave the hooks that read it waiting on a pipe nobody closes.
         return subprocess.run(
             [str(part) for part in command],
             check=False,
             capture_output=True,
             text=True,
             env=env,
+            input="" if payload is None else json.dumps(payload),
         )
 
     @staticmethod
@@ -137,6 +141,131 @@ class AlwaysOnHookTest(unittest.TestCase):
         self.assertEqual("node", hook["command"])
         self.assertEqual(
             ["${CLAUDE_PLUGIN_ROOT}/hooks/always-on.mjs"],
+            hook["args"],
+        )
+
+    def test_runtimes_stay_silent_for_a_session_turned_off(self):
+        # SessionStart fires again on resume and compaction, so a mid-session
+        # "stop adhd mode" is only worth anything if the re-injection honours it.
+        (self.config_dir / ".i-have-adhd-always").touch()
+        (self.config_dir / ".i-have-adhd-off-session-one").touch()
+
+        for name, command in self.runtimes():
+            with self.subTest(runtime=name):
+                result = self.run_hook(
+                    command, {"session_id": "session-one", "source": "compact"}
+                )
+                self.assertEqual(0, result.returncode)
+                self.assertEqual("", result.stdout)
+                self.assertEqual("", result.stderr)
+
+    def test_runtimes_inject_for_a_session_that_was_not_turned_off(self):
+        # The marker is named after one session so it cannot silence another
+        # running beside it.
+        (self.config_dir / ".i-have-adhd-always").touch()
+        (self.config_dir / ".i-have-adhd-off-session-one").touch()
+
+        for name, command in self.runtimes():
+            with self.subTest(runtime=name):
+                result = self.run_hook(
+                    command, {"session_id": "session-two", "source": "compact"}
+                )
+                self.assertEqual(0, result.returncode)
+                self.assertIn("ADHD MODE ACTIVE", self.normalize(result.stdout))
+                self.assertEqual("", result.stderr)
+
+    def test_runtimes_inject_when_the_payload_names_no_session(self):
+        # A payload the hook cannot read leaves it no session to check, and
+        # staying silent then would suppress the ruleset for a user who never
+        # asked for that. Injecting is the behaviour this check was added to.
+        (self.config_dir / ".i-have-adhd-always").touch()
+        (self.config_dir / ".i-have-adhd-off-session-one").touch()
+
+        for name, command in self.runtimes():
+            with self.subTest(runtime=name):
+                result = self.run_hook(command)
+                self.assertEqual(0, result.returncode)
+                self.assertIn("ADHD MODE ACTIVE", self.normalize(result.stdout))
+                self.assertEqual("", result.stderr)
+
+
+class SessionStateHookTest(unittest.TestCase):
+    """The UserPromptSubmit hook: records the phrase that turns the mode off."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        self.plugin_root = Path(self.temp_dir.name) / "plugin"
+        shutil.copytree(ROOT / "hooks", self.plugin_root / "hooks")
+        self.config_dir = Path(self.temp_dir.name) / "claude config"
+        self.config_dir.mkdir()
+        self.node = shutil.which("node")
+        if not self.node:
+            self.skipTest("this hook has no shell fallback, so it needs node")
+
+    def run_hook(self, prompt, session_id="session-one"):
+        env = os.environ.copy()
+        env["CLAUDE_CONFIG_DIR"] = str(self.config_dir)
+        return subprocess.run(
+            [self.node, str(self.plugin_root / "hooks" / "session-state.mjs")],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+            input=json.dumps({"session_id": session_id, "prompt": prompt}),
+        )
+
+    def marker(self, session_id="session-one"):
+        return self.config_dir / (".i-have-adhd-off-" + session_id)
+
+    def test_records_the_off_phrase_against_the_session(self):
+        (self.config_dir / ".i-have-adhd-always").touch()
+
+        result = self.run_hook("stop adhd mode")
+
+        self.assertEqual(0, result.returncode)
+        self.assertTrue(self.marker().exists())
+        self.assertEqual("", result.stdout)
+
+    def test_the_skill_invocation_turns_it_back_on(self):
+        (self.config_dir / ".i-have-adhd-always").touch()
+        self.marker().touch()
+
+        result = self.run_hook("/i-have-adhd")
+
+        self.assertEqual(0, result.returncode)
+        self.assertFalse(self.marker().exists())
+
+    def test_quoted_and_fenced_text_is_discussion_not_instruction(self):
+        # The phrase appears in this project's own docs, in the ruleset the
+        # SessionStart hook injects, and in any conversation about the plugin.
+        # Acting on a quotation would turn the mode off for talking about it.
+        (self.config_dir / ".i-have-adhd-always").touch()
+
+        for prompt in ('the docs say "stop adhd mode" somewhere', "run `normal mode`"):
+            with self.subTest(prompt=prompt):
+                result = self.run_hook(prompt)
+                self.assertEqual(0, result.returncode)
+                self.assertFalse(self.marker().exists())
+
+    def test_a_session_id_that_is_not_a_plain_token_is_refused(self):
+        # The id names a file. One carrying separators would place the marker
+        # outside the config directory.
+        (self.config_dir / ".i-have-adhd-always").touch()
+
+        result = self.run_hook("stop adhd mode", session_id="../escaped")
+
+        self.assertEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
+        self.assertEqual([], list(self.config_dir.glob(".i-have-adhd-off-*")))
+
+    def test_hook_uses_shell_free_node_exec_form(self):
+        config = json.loads((ROOT / "hooks" / "hooks.json").read_text())
+        hook = config["hooks"]["UserPromptSubmit"][0]["hooks"][0]
+
+        self.assertEqual("node", hook["command"])
+        self.assertEqual(
+            ["${CLAUDE_PLUGIN_ROOT}/hooks/session-state.mjs"],
             hook["args"],
         )
 
