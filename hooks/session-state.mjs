@@ -32,9 +32,13 @@ const STALE_MARKER_MS = 7 * 24 * 60 * 60 * 1000;
 // The phrases SKILL.md names as turning the ruleset off.
 const OFF_PHRASES = /\b(?:stop adhd mode|normal mode)\b/i;
 // Re-enabling is the skill's own invocation, the one way the docs describe.
-// Claude Code wraps a user-invoked skill in a <command-name> envelope; a plain
-// typed `/i-have-adhd` reaches the hook as itself.
-const ON_PHRASES = /(?:^|\s)\/i-have-adhd\b|<command-name>\s*\/?i-have-adhd\s*<\/command-name>/i;
+// Claude Code wraps a user-invoked skill in a <command-name> envelope, and it
+// names a plugin-provided skill there as `/<plugin>:<skill>` — observed as
+// `<command-name>/i-have-adhd:i-have-adhd</command-name>`. Matching the bare name
+// alone misses that form, and so does a leading-whitespace pattern, because the
+// character before the slash is the envelope's `>`. Both shapes are named here.
+const ON_PHRASES =
+  /<command-name>\s*\/?(?:i-have-adhd:)?i-have-adhd\s*<\/command-name>|(?:^|\s)\/(?:i-have-adhd:)?i-have-adhd\b/i;
 
 // A session id names a file, so refuse anything that is not the plain token
 // shape Claude Code uses. Without this a crafted id could walk out of the

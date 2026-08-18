@@ -228,14 +228,23 @@ class SessionStateHookTest(unittest.TestCase):
         self.assertEqual("", result.stdout)
 
     def test_the_skill_invocation_turns_it_back_on(self):
-        (self.config_dir / ".i-have-adhd-always").touch()
-        self.marker().touch()
+        # Both shapes the invocation arrives in. The harness wraps a user-invoked
+        # skill in a <command-name> envelope and names a plugin-provided one as
+        # /<plugin>:<skill>, which is what a real invocation of this skill looks
+        # like; the bare form is what a plain typed command looks like.
+        for prompt in (
+            "<command-name>/i-have-adhd:i-have-adhd</command-name>",
+            "/i-have-adhd",
+        ):
+            with self.subTest(prompt=prompt):
+                (self.config_dir / ".i-have-adhd-always").touch()
+                self.marker().touch()
 
-        result = self.run_hook("/i-have-adhd")
+                result = self.run_hook(prompt)
 
-        self.assertEqual(0, result.returncode)
-        self.assertFalse(self.marker().exists())
-        self.assertIn("ADHD MODE ACTIVE", result.stdout)
+                self.assertEqual(0, result.returncode)
+                self.assertFalse(self.marker().exists())
+                self.assertIn("ADHD MODE ACTIVE", result.stdout)
 
     def test_quoted_and_fenced_text_is_discussion_not_instruction(self):
         # The phrase appears in this project's own docs, in the ruleset the
