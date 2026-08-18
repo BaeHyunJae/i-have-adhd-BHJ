@@ -1,5 +1,5 @@
 // UserPromptSubmit hook: keeps "stop adhd mode" in force for the rest of the
-// session.
+// session, and restates that the ruleset applies once per prompt.
 //
 // Why: the SessionStart hook's matcher covers `compact`, so a compaction
 // re-injects the ruleset and re-asserts ADHD MODE ACTIVE. The banner
@@ -12,8 +12,13 @@
 // never silences another one running beside it. A fresh session takes a new id
 // and so cannot carry a marker, which is why there is no source branch here.
 //
+// The reminder is on by default and turned off with a .i-have-adhd-no-reminder
+// file, the same shape as the opt-in flag. It restates a ruleset that is already
+// in context rather than carrying one, which is why it is worth a line per prompt
+// only where something else competes for the model's attention every turn.
+//
 // Runs under Node for the same reason as always-on.mjs: no POSIX shell needed.
-// Never blocks a prompt: any failure exits 0.
+// Never blocks a prompt: any failure exits 0 and emits nothing.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -101,6 +106,8 @@ try {
   if (!SESSION_ID.test(sessionId)) process.exit(0);
 
   const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
+  const alwaysPath = path.join(claudeDir, ".i-have-adhd-always");
+  const quietPath = path.join(claudeDir, ".i-have-adhd-no-reminder");
   const markerPrefix = ".i-have-adhd-off-";
   const markerPath = path.join(claudeDir, markerPrefix + sessionId);
 
@@ -111,6 +118,24 @@ try {
     sweepStaleMarkers(claudeDir, markerPrefix);
     writeMarker(markerPath);
   }
+
+  // Nothing to restate unless always-on put the ruleset in context, and saying
+  // it is active would be a lie once the user has turned the mode off.
+  const active =
+    fs.existsSync(alwaysPath) &&
+    !fs.existsSync(markerPath) &&
+    !fs.existsSync(quietPath);
+  if (!active) process.exit(0);
+
+  process.stdout.write(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext:
+          "ADHD MODE ACTIVE (always-on) — the ruleset injected at session start applies to this response.",
+      },
+    }),
+  );
 } catch {
   // Never block a prompt.
   process.exit(0);

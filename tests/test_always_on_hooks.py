@@ -190,7 +190,7 @@ class AlwaysOnHookTest(unittest.TestCase):
 
 
 class SessionStateHookTest(unittest.TestCase):
-    """The UserPromptSubmit hook: records the phrase that turns the mode off."""
+    """The UserPromptSubmit hook: records the off phrase, restates the ruleset."""
 
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -235,6 +235,7 @@ class SessionStateHookTest(unittest.TestCase):
 
         self.assertEqual(0, result.returncode)
         self.assertFalse(self.marker().exists())
+        self.assertIn("ADHD MODE ACTIVE", result.stdout)
 
     def test_quoted_and_fenced_text_is_discussion_not_instruction(self):
         # The phrase appears in this project's own docs, in the ruleset the
@@ -247,6 +248,42 @@ class SessionStateHookTest(unittest.TestCase):
                 result = self.run_hook(prompt)
                 self.assertEqual(0, result.returncode)
                 self.assertFalse(self.marker().exists())
+
+    def test_the_reminder_is_silent_unless_the_ruleset_is_in_context(self):
+        # The reminder restates a ruleset; it does not carry one. Without the
+        # always-on flag nothing was injected, so there is nothing to restate.
+        result = self.run_hook("hello")
+
+        self.assertEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
+
+    def test_the_reminder_is_silent_for_a_session_turned_off(self):
+        (self.config_dir / ".i-have-adhd-always").touch()
+        self.marker().touch()
+
+        result = self.run_hook("hello")
+
+        self.assertEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
+
+    def test_the_reminder_can_be_opted_out_of(self):
+        (self.config_dir / ".i-have-adhd-always").touch()
+        (self.config_dir / ".i-have-adhd-no-reminder").touch()
+
+        result = self.run_hook("hello")
+
+        self.assertEqual(0, result.returncode)
+        self.assertEqual("", result.stdout)
+
+    def test_the_reminder_is_valid_hook_output(self):
+        (self.config_dir / ".i-have-adhd-always").touch()
+
+        result = self.run_hook("hello")
+
+        payload = json.loads(result.stdout)
+        self.assertEqual(
+            "UserPromptSubmit", payload["hookSpecificOutput"]["hookEventName"]
+        )
 
     def test_a_session_id_that_is_not_a_plain_token_is_refused(self):
         # The id names a file. One carrying separators would place the marker
