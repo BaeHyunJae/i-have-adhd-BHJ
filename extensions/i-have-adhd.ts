@@ -6,6 +6,10 @@ import {
   type ExtensionAPI,
   type ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
+import {
+  contextMessages,
+  latestMarkerIsActive,
+} from "./context-compat";
 
 const EXTENSION_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_PATH = join(
@@ -87,19 +91,11 @@ function getSavedState(ctx: ExtensionContext): boolean | undefined {
  * injected again.
  */
 function rulesAreInContext(ctx: ExtensionContext): boolean {
-  let active = false;
-
-  for (const entry of ctx.sessionManager.buildContextEntries()) {
-    if (entry.type !== "custom_message") continue;
-
-    if (entry.customType === RULES_MESSAGE_TYPE) {
-      active = true;
-    } else if (entry.customType === DISABLED_MESSAGE_TYPE) {
-      active = false;
-    }
-  }
-
-  return active;
+  return latestMarkerIsActive(
+    contextMessages(ctx.sessionManager),
+    RULES_MESSAGE_TYPE,
+    DISABLED_MESSAGE_TYPE,
+  );
 }
 
 export default function iHaveAdhdExtension(pi: ExtensionAPI) {

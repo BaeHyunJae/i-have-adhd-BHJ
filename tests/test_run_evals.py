@@ -130,7 +130,11 @@ class EvaluationHarnessTest(unittest.TestCase):
                 json.dumps(
                     {
                         "stub": {
-                            "command": ["sh", "-c", f"touch {marker} && echo hi"],
+                            "command": [
+                                sys.executable,
+                                "-c",
+                                f"from pathlib import Path; Path({str(marker)!r}).touch(); print('hi')",
+                            ],
                             "response_format": "text",
                         }
                     }
