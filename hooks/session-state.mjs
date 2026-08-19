@@ -12,10 +12,9 @@
 // never silences another one running beside it. A fresh session takes a new id
 // and so cannot carry a marker, which is why there is no source branch here.
 //
-// The reminder is on by default and turned off with a .i-have-adhd-no-reminder
-// file, the same shape as the opt-in flag. It restates a ruleset that is already
-// in context rather than carrying one, which is why it is worth a line per prompt
-// only where something else competes for the model's attention every turn.
+// The reminder restates a ruleset that is already in context rather than
+// carrying one, which is why it is worth a line per prompt: long sessions and
+// competing per-turn injections wear the ruleset down, and one line re-anchors it.
 //
 // Runs under Node for the same reason as always-on.mjs: no POSIX shell needed.
 // Never blocks a prompt: any failure exits 0 and emits nothing.
@@ -111,7 +110,6 @@ try {
 
   const claudeDir = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), ".claude");
   const alwaysPath = path.join(claudeDir, ".i-have-adhd-always");
-  const quietPath = path.join(claudeDir, ".i-have-adhd-no-reminder");
   const markerPrefix = ".i-have-adhd-off-";
   const markerPath = path.join(claudeDir, markerPrefix + sessionId);
 
@@ -125,10 +123,7 @@ try {
 
   // Nothing to restate unless always-on put the ruleset in context, and saying
   // it is active would be a lie once the user has turned the mode off.
-  const active =
-    fs.existsSync(alwaysPath) &&
-    !fs.existsSync(markerPath) &&
-    !fs.existsSync(quietPath);
+  const active = fs.existsSync(alwaysPath) && !fs.existsSync(markerPath);
   if (!active) process.exit(0);
 
   process.stdout.write(

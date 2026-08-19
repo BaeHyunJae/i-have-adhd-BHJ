@@ -325,15 +325,6 @@ class SessionStateHookTest(unittest.TestCase):
         self.assertEqual(0, result.returncode)
         self.assertEqual("", result.stdout)
 
-    def test_the_reminder_can_be_opted_out_of(self):
-        (self.config_dir / ".i-have-adhd-always").touch()
-        (self.config_dir / ".i-have-adhd-no-reminder").touch()
-
-        result = self.run_hook("hello")
-
-        self.assertEqual(0, result.returncode)
-        self.assertEqual("", result.stdout)
-
     def test_the_reminder_is_valid_hook_output(self):
         (self.config_dir / ".i-have-adhd-always").touch()
 
