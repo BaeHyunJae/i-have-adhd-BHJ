@@ -116,7 +116,7 @@ For long lists in the final response, group related items and rank the most rele
 
 Never omit relevant items when completeness matters. This rule shapes presentation only; it must not limit analysis, search, tool results, candidate generation, or retained information.
 
-This caps enumerations, not procedures. A numbered sequence under rule 2 runs as long as the task needs; cutting a required step breaks the answer.
+A numbered procedure under rule 2 is not a list to trim. Group its steps into phases if that helps, but show every required step; never cut or defer one.
 
 ### 10. No preamble, no recap, no closing pleasantries
 
