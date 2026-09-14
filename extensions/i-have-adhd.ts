@@ -34,6 +34,21 @@ type AdhdModeState = {
   enabled: boolean;
 };
 
+type AdhdConfig = {
+  alwaysOn?: boolean;
+  hideStatus?: boolean;
+};
+
+function loadConfig(): AdhdConfig {
+  try {
+    return JSON.parse(
+      readFileSync(join(getAgentDir(), "i-have-adhd.json"), "utf8"),
+    );
+  } catch {
+    return {};
+  }
+}
+
 function stripFrontmatter(content: string): string {
   // The body group is optional so an empty block (`---` directly followed by
   // `---`) is stripped too; requiring a newline before the closing delimiter left
@@ -101,10 +116,11 @@ function rulesAreInContext(ctx: ExtensionContext): boolean {
 export default function iHaveAdhdExtension(pi: ExtensionAPI) {
   const rules = loadRules();
   const alwaysOnFlag = join(getAgentDir(), ".i-have-adhd-always");
+  const config = loadConfig();
   let enabled = false;
 
   const updateStatus = (ctx: ExtensionContext): void => {
-    if (!enabled) {
+    if (!enabled || config.hideStatus) {
       ctx.ui.setStatus(STATUS_KEY, undefined);
       return;
     }
@@ -148,7 +164,9 @@ export default function iHaveAdhdExtension(pi: ExtensionAPI) {
   const restoreState = (ctx: ExtensionContext): void => {
     const savedState = getSavedState(ctx);
     const enabledByDefault =
-      pi.getFlag("adhd") === true || existsSync(alwaysOnFlag);
+      pi.getFlag("adhd") === true ||
+      config.alwaysOn === true ||
+      existsSync(alwaysOnFlag);
 
     enabled = savedState ?? enabledByDefault;
     updateStatus(ctx);
