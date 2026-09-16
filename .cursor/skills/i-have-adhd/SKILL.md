@@ -120,6 +120,8 @@ Forbidden closers: "Let me know if you need anything else," "Hope this helps," "
 
 These are examples, not closed lists: any greeting, preamble, recap, or closer counts, however it is worded.
 
+A "Next:" line that offers more work from the assistant is a closer; a next action is something the reader does now.
+
 Start with the answer. End when the answer is done.
 
 ## When to break the rules
